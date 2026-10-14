@@ -1,0 +1,1 @@
+const { ApplicationCommandOptionType } = require('discord.js'); module.exports = { name: 'addrole', description: 'Add a role to a user', options: [ { name: 'user', description: 'The user to add the role to', type: ApplicationCommandOptionType.User, required: true }, { name: 'role', description: 'The role to add', type: ApplicationCommandOptionType.Role, required: true } ] };

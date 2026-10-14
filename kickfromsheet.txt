@@ -1,0 +1,93 @@
+const { readExcelAsObjects } = require('./sheet.js');
+
+/**
+ * Reads role_zoned_members.xlsx and kicks every matched Discord member.
+ * @param {import('discord.js').Guild} guild - the Discord server to kick members from
+ */
+async function kickFromSheet(guild) {
+    const data = readExcelAsObjects('role_zoned_members.xlsx');
+    console.log(`Found ${data.length} rows`);
+
+    // IMPORTANT: keys here must match your actual Excel column headers exactly.
+    const simplified = data.map(row => ({
+        fullName: row["Display Name"],
+        discordUsername: row["Username"]
+    }));
+
+    // Sanity check — preview first 3 rows before doing anything
+    console.log('Preview:', simplified.slice(0, 3));
+
+    // Fetch all members ONCE, not inside the loop (much faster + avoids rate limits)
+    console.log('Fetching all guild members...');
+    const members = await guild.members.fetch();
+    console.log(`Fetched ${members.size} members from the server.`);
+
+    let count = 0;
+    let failed = 0;
+
+    for (const row of simplified) {
+        const usernameToFind = row.discordUsername;
+
+        if (!usernameToFind) {
+            console.log(`⚠️ Skipping row for "${row.fullName}" — no Discord username in sheet.`);
+            failed++;
+            continue;
+        }
+
+        const member = members.find(
+            m => m.user.username.toLowerCase() === String(usernameToFind).toLowerCase()
+        );
+
+        if (!member) {
+            console.log(`❌ Could not find Discord user: ${usernameToFind} (${row.fullName})`);
+            failed++;
+            continue;
+        }
+
+        try {
+            await member.kick();
+            console.log(`✅ ${row.fullName} (${usernameToFind}) kicked successfully`);
+            count++;
+        } catch (err) {
+            console.error(`❌ Failed to kick ${usernameToFind}:`, err.message);
+            failed++;
+        }
+    }
+
+    console.log(`\nTotal users kicked: ${count}`);
+    console.log(`Total failed/skipped: ${failed}`);
+}
+
+module.exports = { kickFromSheet };
+ //============================================================================================================
+    //==============================================================================================================
+client.once('ready', async () => {
+    console.log(`Bot is online as ${client.user.tag}`);
+ 
+    const guildId = process.env.GUILD_ID;
+ 
+    if (!guildId) {
+        console.error('❌ GUILD_ID is missing from your .env file.');
+        return;
+    }
+ 
+    const guild = client.guilds.cache.get(guildId);
+ 
+    if (!guild) {
+        console.error(`❌ Guild not found for ID "${guildId}". Make sure the bot is actually in that server and GUILD_ID is correct.`);
+        return;
+    }
+ 
+    console.log(`Running kick operation on server: ${guild.name}`);
+ 
+    try {
+        await kickFromSheet(guild);
+        console.log('Kick operation completed.');
+    } catch (error) {
+        console.error('Kick operation failed:', error);
+    }
+ 
+    // NOTE: no process.exit() here — this keeps the bot running.
+    // If you want this to run ONCE and then shut down, uncomment the next line:
+    // process.exit(0);
+});
